@@ -153,10 +153,11 @@ class SampleGenerator(object):
 
 # Parameters
 learning_rate = 1.0
-#training_steps = 100000
-training_steps = 3
+training_steps = 100000
 batch_size = 128
 display_step = 100
+learning_decay_rate = 0.96
+learning_decay_steps = 30000
 
 # Network Parameters
 hidden_cells = 64
@@ -175,6 +176,9 @@ seqlen = tf.placeholder(tf.int32, [None])
 # Weight and bias for the output
 w = tf.Variable(tf.random_normal([hidden_cells, vocabulary_size]))
 b = tf.Variable(tf.random_normal([vocabulary_size]))
+
+# Count the number of steps taken
+global_step = tf.Variable(0, trainable=False)
 
 def dynamicRNN(x, seqlen, weights, biases):
     # We squeeze the data such that it fits into our RNN
@@ -211,8 +215,12 @@ def dynamicRNN(x, seqlen, weights, biases):
 prediction = dynamicRNN(x,seqlen, w, b)
 first_choice = tf.argmax(prediction,2)
 loss = tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(-tf.log(prediction)*y,2),1))
+learning_rate_comp = tf.train.exponential_decay(learning_rate, global_step,
+                                                learning_decay_steps,
+                                                learning_decay_rate,
+                                                staircase=True)
 optimizer = tf.train.GradientDescentOptimizer(
-    learning_rate=learning_rate).minimize(loss)
+    learning_rate=learning_rate_comp).minimize(loss, global_step=global_step)
 accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(prediction,2), tf.argmax(y,2)),"float"))
 
 init = tf.initialize_all_variables()
@@ -223,14 +231,14 @@ with tf.Session() as sess:
     while step <= training_steps:
         # get batch and train
         batch_x, batch_y, batch_seqlen = training_set.next(batch_size)
-        training_loss, _, training_accuracy = sess.run(
-            [loss, optimizer, accuracy],
+        training_loss, _, training_accuracy, cur_lrate = sess.run(
+            [loss, optimizer, accuracy, learning_rate_comp],
             feed_dict={x:batch_x, y:batch_y, seqlen:batch_seqlen})
         
         # sometimes write something useful
         if step % display_step == 0:
-            print("At step %d: trainig set loss = %2.5f, training set accuracy = %1.5f"
-                  % (step, training_loss, training_accuracy))
+            print("At step %d with rate %1.5f on trainig set: loss = %2.5f, accuracy = %1.5f"
+                  % (step, cur_lrate, training_loss, training_accuracy))
 
         step += 1
         
