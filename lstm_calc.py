@@ -49,9 +49,9 @@ class CalcNode(object):
             # deepest level allowed.
             self.value = random.randrange(10)
         else:
-            # Dice whether to fill in a operation (prop=2/3)
+            # Dice whether to fill in a operation (prop=3/4)
             # or a digit.
-            if random.randrange(3)<2:
+            if random.randrange(4)<3:
                 # it's an op
                 self.value = random.randrange(10,14)
                 self.left = CalcNode(depth+1)
@@ -59,21 +59,6 @@ class CalcNode(object):
             else:
                 #it's a digit
                 self.value = random.randrange(10)
-
-    # produce a human readable string of the RPN
-    def read(self):
-        if self.value < 10:
-            return str(self.value)
-        else:
-            if self.value == 10:
-                op = "+"
-            elif self.value == 11:
-                op = "-"
-            elif self.value == 12:
-                op = "*"
-            elif self.value == 13:
-                op = "/"
-            return self.left.read()+self.right.read()+op
 
     # produce a list representation of the RPN
     def read_list(self):
@@ -100,6 +85,22 @@ class CalcNode(object):
                 return a*b
             elif self.value == 13:
                 return a/b
+
+# convert a list of int representation into a string
+def rpn_list_to_string(rpn):
+    ret = ""
+    for item in rpn:
+        if item < 10:
+            ret += str(item)
+        elif item == 10:
+            ret += "+"
+        elif item == 11:
+            ret += "-"
+        elif item == 12:
+            ret += "*"
+        elif item == 13:
+            ret += "/"
+    return ret
 
 # Objects of SampleGenerator actually produce input for the RPN.
 class SampleGenerator(object):
@@ -152,9 +153,10 @@ class SampleGenerator(object):
 
 # Parameters
 learning_rate = 1.0
-training_steps = 50
+#training_steps = 100000
+training_steps = 3
 batch_size = 128
-display_step = 10
+display_step = 100
 
 # Network Parameters
 hidden_cells = 64
@@ -207,6 +209,7 @@ def dynamicRNN(x, seqlen, weights, biases):
     return result
 
 prediction = dynamicRNN(x,seqlen, w, b)
+first_choice = tf.argmax(prediction,2)
 loss = tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(-tf.log(prediction)*y,2),1))
 optimizer = tf.train.GradientDescentOptimizer(
     learning_rate=learning_rate).minimize(loss)
@@ -235,8 +238,17 @@ with tf.Session() as sess:
     print("Final trainigset accuracy: %1.6f" % training_accuracy)
         
     batch_x, batch_y, batch_seqlen = test_set.next(batch_size)
-    test_loss, _, test_accuracy = sess.run(
-        [loss, optimizer, accuracy],
+    test_loss, _, test_accuracy, test_1st_choice = sess.run(
+        [loss, optimizer, accuracy, first_choice],
         feed_dict={x:batch_x, y:batch_y, seqlen:batch_seqlen})
     print("Final test set loss:       %2.5f" % test_loss)
     print("Final test set accuracy:   %1.6f" % test_accuracy)
+
+    print("Some sample predictions:")
+    for i in range(50):
+        input = rpn_list_to_string(
+            np.argmax(batch_x[i],1)[:batch_seqlen[i]]
+        )
+        label = rpn_list_to_string(np.argmax(batch_y[i],1))
+        predict = rpn_list_to_string(test_1st_choice[i])
+        print(" * Prediction for %31s is %5s, correct is %5s."%(input,predict,label))
