@@ -36,7 +36,7 @@ import random
 #  A sequence that is shorter will be padded by +.
 ##
 
-max_tree_depth = 3
+max_tree_depth = 4
 max_seq_length_in = 2**(max_tree_depth+1)-1
 max_seq_length_out = 5
 vocabulary_size = 14
@@ -153,7 +153,7 @@ class SampleGenerator(object):
 
 # Parameters
 learning_rate = 1.0
-training_steps = 100000
+training_steps = 50000
 batch_size = 128
 display_step = 100
 learning_decay_rate = 0.96
@@ -246,8 +246,8 @@ with tf.Session() as sess:
     print("Final trainigset accuracy: %1.6f" % training_accuracy)
         
     batch_x, batch_y, batch_seqlen = test_set.next(batch_size)
-    test_loss, _, test_accuracy, test_1st_choice = sess.run(
-        [loss, optimizer, accuracy, first_choice],
+    test_loss, test_accuracy, test_1st_choice = sess.run(
+        [loss, accuracy, first_choice],
         feed_dict={x:batch_x, y:batch_y, seqlen:batch_seqlen})
     print("Final test set loss:       %2.5f" % test_loss)
     print("Final test set accuracy:   %1.6f" % test_accuracy)
